@@ -124,7 +124,8 @@ flowchart TB
   B --> C{"Es fila Full?<br/>PF_IsFullGroupRow"}
   C -->|no| N["Siguiente fila"]
   C -->|si| D["Sumar tarimas del bloque"]
-  D --> E{"total > maxShipment?"} -->|120| s16 -->|si| s17 -->|no| s18 -->|si y dentro de cupo| s19 -->|no| s20 -->|si| s21 -->|no| s22```
+  D --> E{"total > maxShipment?"} -->|120| s16 -->|si| s17 -->|no| s18 -->|si y dentro de cupo| s19 -->|no| s20 -->|si| s21 -->|no| s22
+```
 
 ### Paso 0: reordenar
 
