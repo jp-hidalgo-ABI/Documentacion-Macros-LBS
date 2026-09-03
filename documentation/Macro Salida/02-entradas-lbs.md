@@ -58,8 +58,7 @@ Un renglón por embarque que LBS logró armar. Encabezados tomados de
 | `A` | `Shipment Id` | **Sí.** Es la llave. `tms_fg14/modulo2.vba:1546` |
 | `B` | `Status` | No |
 | `C` | `Equipment Id` | No — el equipo se toma de `STP-Equipment Assoc` |
-| `D` | `Origin Location Id` | No |
-    60|| `E` | `Destination Location Id` | No |
+| `D` | `Origin Location Id` | No |   60|| `E` | `Destination Location Id` | No |
 | `F` | `Shipment Date` | No |
 | `G` | `Delivery Date` | No |
 | `H` | `Lane Lock Date` | No |
@@ -68,8 +67,7 @@ Un renglón por embarque que LBS logró armar. Encabezados tomados de
 | `K` | `Load Target` | No |
 | `L` | `Load Efficiency` | **Sí.** El fill rate que reporta LBS. `tms_fg14/modulo2.vba:4822` |
 | `M` | `Creation Date` | No |
-| `N` | `Urgent` | No |
-    70|| `O` | `Rank` | No |
+| `N` | `Urgent` | No | 70|| `O` | `Rank` | No |
 | `P` `Q` | `Delivery Window Begin` / `End` | No |
 | `R` `S` | `Ship Window Begin` / `End` | No |
 | `T` `U` | `Shift Number` / `Is Shift End Of Day` | No |
@@ -78,8 +76,7 @@ Un renglón por embarque que LBS logró armar. Encabezados tomados de
 | `X` | `Imperial Units` | No |
 | `Y` | `User` | No |
 | `Z` | `Lane Id` | **Sí.** De aquí sale la planta origen. Ver abajo |
-| `AA` | `Pieces` | No |
-    80|| `AB` | `Pallets` | No |
+| `AA` | `Pieces` | No | 80|| `AB` | `Pallets` | No |
 | `AC` `AD` | `Order Value` / `Declared Value` | No |
 | `AE` | `Operation Type` | No |
 
@@ -151,8 +148,7 @@ Encabezados tomados de [tms_fg14/rollback/stp faillures.tsv](../../tms_fg14/roll
 
 | Col | Encabezado | Para qué sirve al operador |
 |---|---|---|
-| `A` | `Order Id` | El pedido que falló |
-   150|| `B` | `Lane Id` | El carril, y con él la planta origen |
+| `A` | `Order Id` | El pedido que falló |150|| `B` | `Lane Id` | El carril, y con él la planta origen |
 | `C` `D` | `From Location Id` / `To Location Id` | Origen y destino |
 | `E` | `Item Id` | El SKU, con el sufijo de cadena incluido |
 | `F` | **`Reason`** | El motivo. La columna que hay que leer |
@@ -161,8 +157,7 @@ Encabezados tomados de [tms_fg14/rollback/stp faillures.tsv](../../tms_fg14/roll
 | `I` | `Failed Shippable Quantity` | Cuántas quedaron fuera |
 | `J` | `Raw Per Shippable Quantity` | Factor de conversión |
 | `K` `L` `M` | `Total` / `Scheduled` / `Failed Raw Quantity` | Lo mismo en unidades crudas |
-| `N` | `Approved` | Bandera de LBS |
-   160|| `O`…`S` | `Start Date`, `End Date`, `Arrival Date`, `Demand Due Date`, `Lock Date` | Las fechas de la ventana |
+| `N` | `Approved` | Bandera de LBS |160|| `O`…`S` | `Start Date`, `End Date`, `Arrival Date`, `Demand Due Date`, `Lock Date` | Las fechas de la ventana |
 | `T`…`W` | `Initially Peggable`, `Initial Pegging Violation`, `Initial Lock Violation`, `Initially Unlocked` | Diagnóstico interno de LBS |
 | `X` `Y` | `Criticality` / `Inv Adj Criticality` | Prioridad |
 | `Z` `AA` | `Equipment Availability` / `Equipment Target Type` | Diagnóstico de equipo |
@@ -193,8 +188,7 @@ con qué SKU, cuántas cajas y cuánto pesa. Es de aquí de donde nace cada fila
 
 | Col | Encabezado | Lo usa el motor |
 |---|---|---|
-| `A` | `Loading Seq` | No (solo como respaldo para contar filas) |
-   190|| `B` | `Load Space Index` | No |
+| `A` | `Loading Seq` | No (solo como respaldo para contar filas) |190|| `B` | `Load Space Index` | No |
 | `C` | `Shipment Id` | **Sí.** Forma el folio `AD` |
 | `D` | `Equipment Id` | No |
 | `E` `F` | `Lane Id` / `Actual Lane Id` | No |
@@ -203,8 +197,7 @@ con qué SKU, cuántas cajas y cuánto pesa. Es de aquí de donde nace cada fila
 | `I`…`L` | `X1` `Y1` `X2` `Y2` | No — la geometría en el piso del camión |
 | `M` | `Deck Level` | No |
 | `N` `O` `P` | `Sub LayerId` / `Sub UnitId` / `Sub UnitType` | No |
-| `Q` | **`ItemId`** | **Sí.** El SKU con sufijo de cadena. Va a `PS!X` |
-   200|| `R` | `Raw Quantity` | No |
+| `Q` | **`ItemId`** | **Sí.** El SKU con sufijo de cadena. Va a `PS!X` |200|| `R` | `Raw Quantity` | No |
 | `S` | **`Order Raw Quantity`** | **Sí.** El cartonaje. Va a `PS!S` |
 | `T` | **`Weight`** | **Sí.** El peso en kg. Va a `PS!AT` |
 | `U` | `Cum Weight` | No |
@@ -213,8 +206,7 @@ con qué SKU, cuántas cajas y cuánto pesa. Es de aquí de donde nace cada fila
 | `X` `Y` | `Volume` / `Cum Volume` | No |
 | `Z` | **`OrderId`** | **Sí.** El pedido. Va a `PS!P` tras cortar en el primer `_` |
 | `AA` | `Stack Group` | No |
-| `AB` | `Rank` | No |
-   210|| `AC` | `Is Urgent` | No |
+| `AB` | `Rank` | No | 210|| `AC` | `Is Urgent` | No |
 | `AD` | `Is ProductionPlan` | No |
 
 ### El ordenamiento importa
