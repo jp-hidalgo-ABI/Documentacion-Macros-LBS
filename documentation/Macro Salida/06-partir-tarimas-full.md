@@ -114,7 +114,7 @@ El umbral `T >= 4` es la parte no obvia. Una fila con tarimas completas y restos
 tarima adicional solo si tiene cuatro o más tarimas completas. Con menos, la charola ya cabe
 en el espacio contado por `T`.
 
-   110|## El flujo por grupo
+   110| ## El flujo por grupo
 
 Para cada grupo de folio (`tms_fg14/modulo5.vba:1507-1586`):
 

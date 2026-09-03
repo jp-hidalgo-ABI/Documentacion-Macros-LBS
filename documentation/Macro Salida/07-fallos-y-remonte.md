@@ -18,7 +18,7 @@ flowchart TB
   C --> D["CompararCartonajes<br/>modulo3:886"]
   D --> E["LBS_ConsolidarRestos<br/>modulo2:21135"]
   E --> F["Mensaje final con el tiempo"]
-    20|```
+```
 
 ## Paso 1: traer los fallos de LBS
 
