@@ -12,7 +12,7 @@ que convierte los resultados de LBS en la carga para TMS y SAP.
 | Libro anfitrión | `Planificacion_Plantas_Restos*.xlsm` | `Plantas_Restos_LBS_TO_TMS*.xlsm` |
 | Qué recibe | Plan comercial, inventarios, catálogos maestros | Resultados de LBS + el mismo Plan |
 | Qué entrega | `MEX KA PLANTS_Restos_v*.xlsx` (import a LBS) | `ProcessShipmentOrderCreate_DS_*.xls` (TMS) y CSV de Adicionales SAP |
-| Documentación | [merged/](merged/README.md) | [tms_fg14/](tms_fg14/README.md) |
+| Documentación | [Macro Entrada/](Macro%20Entrada/README.md) | [Macro Salida/](Macro%20Salida/README.md) |
 
 La macro de entrada decide **qué se puede pedir y desde qué planta**. LBS decide **cómo
 agrupar eso en embarques**. La macro de salida decide **cómo se arman físicamente las
@@ -76,10 +76,10 @@ con una página por cadena o familia de cadenas y una tabla comparativa en su `R
 | Documento | Contenido |
 |---|---|
 | [glosario.md](glosario.md) | Terminología del negocio: folio, cartonaje, tarima, resto, charola, sándwich, cupo, armado, TI HI, mode mix, sencillo/full |
-| [merged/](merged/README.md) | Macro de entrada: Plan, maestros, generación del export MEX KA, validaciones, sincronizaciones |
-| [merged/cadenas/](merged/cadenas/README.md) | Reglas por cadena del lado de entrada (sufijos de item, destinos solo-Full, solo-sencillo) |
-| [tms_fg14/](tms_fg14/README.md) | Macro de salida: importación de LBS, `Pedidos Surtidos`, motor de armado, eficiencia, exports |
-| [tms_fg14/cadenas/](tms_fg14/cadenas/README.md) | Reglas por cadena del lado de salida (cupos, pisos de llenado, altura, peso) |
+| [Macro Entrada/](Macro%20Entrada/README.md) | Macro de entrada: Plan, maestros, generación del export MEX KA, validaciones, sincronizaciones |
+| [Macro Entrada/cadenas/](Macro%20Entrada/cadenas/README.md) | Reglas por cadena del lado de entrada (sufijos de item, destinos solo-Full, solo-sencillo) |
+| [Macro Salida/](Macro%20Salida//README.md) | Macro de salida: importación de LBS, `Pedidos Surtidos`, motor de armado, eficiencia, exports |
+| [Macro Salida/cadenas/](Macro%20Salida//cadenas/README.md) | Reglas por cadena del lado de salida (cupos, pisos de llenado, altura, peso) |
 
 ## Convenciones de esta documentación
 
