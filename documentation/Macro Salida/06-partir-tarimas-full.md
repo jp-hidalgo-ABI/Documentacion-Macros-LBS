@@ -124,18 +124,7 @@ flowchart TB
   B --> C{"Es fila Full?<br/>PF_IsFullGroupRow"}
   C -->|no| N["Siguiente fila"]
   C -->|si| D["Sumar tarimas del bloque"]
-  D --> E{"total > maxShipment?"}
-   120|  E -->|si| F["Recortar el exceso a No planeado<br/>PF_TrimTwoTruckGroupToShipmentCap"]
-  E -->|no| G
-  F --> G{"Ya esta partido?<br/>PF_BlockFullySplit"}
-  G -->|si y dentro de cupo| N
-  G -->|no| H["Resetear AD al folio base"]
-  H --> I["Repartir en cajas a, b, c...<br/>sufijo por caja"]
-  I --> J{"Se agoto el embarque?"}
-  J -->|si| K["Abrir shipment R2, R3...<br/>PF_SpinNewShipment"]
-  J -->|no| L["Recalcular cartonaje y totales"]
-  K --> L
-   130|```
+  D --> E{"total > maxShipment?"} -->|120| s16 -->|si| s17 -->|no| s18 -->|si y dentro de cupo| s19 -->|no| s20 -->|si| s21 -->|no| s22```
 
 ### Paso 0: reordenar
 
