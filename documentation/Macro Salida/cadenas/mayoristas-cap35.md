@@ -57,7 +57,17 @@ por familia.
 | Cupo sencillo | 26 tarimas o catálogo | `LBS_SencilloCapForRow` (`modulo2.vba:5841`) |
 | Piso de llenado | Ninguno propio | No están en `LBS_IsTruckMinFillChain` |
 | Altura máxima | Sin tope | No están en `LBS_ChainEnforcesUnitHeight` |
-| Peso máximo | 29 t | `SK_MAX_PESO_KG` (`modulo2.vba:10`) |
+| Peso máximo Cap35 / mayorista Full | 52.5 t | `LBS_FULL_MAX_PESO_KG` (`Y` Full o dest Mode Mix solo F) |
+| Peso máximo Sencillo | 29 t | `SK_MAX_PESO_KG` (`modulo2.vba:10`) |
+
+Un Full de la lista blanca (`Y` contiene `Full`, o el destinatario es solo F en Mode Mix)
+usa 52.5 t aunque LBS haya escrito `Sencillo` y el catálogo S traiga 28.9 t. Un dest
+con F y S en Mode Mix y `Y=Sencillo` usa el Peso Max S del dest (28.9 t) o 29 t:
+la lane Full de otro origen (p. ej. PC01 CMM 52.5 t) no sube el techo.
+`LBS_CatalogPesoMaxKg` fuerza el diccionario S; `LBS_MaxPesoKgForRow` recorta
+cualquier catálogo por encima del dest S. La misma guarda está en
+`PF_MaxPesoKgForRow` / `PF_CatalogPesoMaxKg`. Asturiano no está en la lista y
+sigue el techo por omisión.
 
 Comentarios originales:
 

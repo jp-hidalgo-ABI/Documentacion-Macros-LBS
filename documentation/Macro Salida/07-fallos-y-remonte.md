@@ -18,7 +18,7 @@ flowchart TB
   C --> D["CompararCartonajes<br/>modulo3:886"]
   D --> E["LBS_ConsolidarRestos<br/>modulo2:21135"]
   E --> F["Mensaje final con el tiempo"]
-```
+    20|```
 
 ## Paso 1: traer los fallos de LBS
 
@@ -293,6 +293,13 @@ Los mensajes de progreso, en orden (`tms_fg14/modulo2.vba:21152-21270`):
 | `Fallos: hard trim over cap` | Recorte duro de lo que quedó sobre cupo |
 | `Fallos: pack mayorista catalog leftovers post-trim` | Segunda pasada de mayoristas |
    270|| `Fallos: remount cupo peels post-trim` | Remonta lo que el recorte descargó |
+| `Fallos: OpenTrucks COMEXTRA/OXXO orphans` | Inventa `P-####` cuando el destino solo tiene `No planeado` |
+| `Fallos: recalc peso final` | Peel de embarque (Full a+b, kg = AU T+W) + OpenTrucks sin remonte de `Descartado: peso` + segundo peel + min-fill |
+| `Fallos: terminal peso peel` | Ultimo peel antes de Z/AU, despues de Plan restore / min-fill / reorder |
+| `Fallos: restore Plan cartonaje gaps` | Inserta NP si Programado+NP quedó bajo Plan |
+| `Fallos: repark height bares after Plan restore` | Reubica restos de altura perdidos en el restore |
+| `Fallos: min-fill after RecalcPeso` | Tira Fulls sueltos bajo piso (P-1428 Z=1) que el peel de peso no tocó |
+| `Fallos: reorder No planeado after Plan restore` | Último `LBS_ReordenarYCompletar`: NP al final, luego Z/AU |
 
 ### Tres cosas que vale la pena notar
 
@@ -300,7 +307,7 @@ Los mensajes de progreso, en orden (`tms_fg14/modulo2.vba:21152-21270`):
 Un camión que pasó el piso en `SummaryOptimizar` puede caer en `SummaryFallo` si el remonte
 lo alteró, y al revés: un camión descartado puede recuperarse si el remonte le sube carga.
 
-**`LBS_ResetConsMap` se llama al entrar** (`tms_fg14/modulo2.vba:21142`). Es la única fase que
+**`LBS_ResetConsMap` se llama al entrar** (`tms_fg14/modulo2.vba:21143`). Es la única fase que
 relee la hoja `Consolida`, así que un cambio en esa hoja sí surte efecto entre
 `SummaryOptimizar` y `SummaryFallo`.
    280|
@@ -309,18 +316,21 @@ a montar lo recortado en otros camiones. Suena redundante pero no lo es: el reco
 espacio en un camión y el remonte busca camiones con espacio, así que la segunda pasada
 puede colocar en otro folio lo que el primero descargó.
 
+**OXXO y COMEXTRA inventan folio si no hay Programado.** `LBS_OpenTruckInventTemplateAD`
+arma un `AD` plantilla y, en OXXO, `LBS_OxxoInventYFromLane` pone `Y` según el Mode Mix de
+la lane. El cupo es el de la lane (no 26/40 de grupo). `Descartado: peso` entra al pool
+en OpenTrucks de Fallos (el folio nuevo se corta al tope con `LBS_OpenTruckMaxTForWeight`).
+En RecalcPeso no se remonta: `skipPesoGaps` deja esos kilos en `No planeado` y el segundo
+peel baja lo que el remonte de cupo haya vuelto a pasar de 29 t.
+
 ## `ConsolidarNoPlaneados`
 
-Es una macro aparte (`tms_fg14/modulo2.vba:5075`), llamada desde `FiltrarPorEficiencia` pero
-también ejecutable sola. Su comentario original la fecha
-(`tms_fg14/modulo2.vba:5073-5074`):
-   290|
-```
-' Requerimiento 05/12 - consolidar los no planeados después de desmontarlos por baja eficiencia
-```
-
-Intenta subir filas `No planeado` a camiones con espacio, después de que el gate de eficiencia
-las desmontó.
+Une filas `No planeado` del mismo origen|dest|pedido|SKU en una sola (suma `S`/`AT`,
+recalcula `T`/`U`, limpia `W`). No remonta a camiones. Corre al final de
+`FiltrarPorEficiencia` y otra vez en Fallos después del peel de peso terminal
+(`Fallos: consolidar no planeado after peso`), para colapsar los `T=1` de
+`Descartado: peso`. Después de cada llamada, `LBS_FixMultiOrderSinglePedidoS` restaura
+las participaciones `*_S`.
 
 ## El mensaje final y el tiempo
 

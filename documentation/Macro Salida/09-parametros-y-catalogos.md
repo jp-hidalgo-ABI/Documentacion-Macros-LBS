@@ -99,7 +99,8 @@ sitio de uso.
 | `LBS_WALMART_MIN_FILL` | `0.4` | 12 de 28 | `modulo2.vba:65` | `' LBS - WALMART: piso de llenado de camion (tarimas). El % de "EFICIENCIA POR CADENA" es fill rate de PEDIDO (col AR, gate de eficiencia) para Walmart/Alsuper — truck floor is this constant (cap 28 -> piso 12). ClubCity (Soriana/City Club) truck floor is LBS_CLUBCITY_MIN_FILL (70% of metro cap 26 -> piso 19).` |
 | `LBS_CLUBCITY_MIN_FILL` | `0.7` | 19 de 26 | `modulo2.vba:67` | `' LBS - CLUBCITY (Soriana + City Club): piso de llenado post-consolidacion (70% del cap).` |
 | `LBS_OXXO_MIN_FILL` | `0.9` | 33 de 36 | `modulo2.vba:69` | `' LBS - OXXO Full: piso de llenado post-consolidacion (90% del shipCap 36 -> piso 33).` |
-| `LBS_COMEXTRA_MIN_FILL` | `0.9` | 36 / 18 / 24 | `modulo2.vba:73` | `' LBS - COMEXTRA: piso de llenado post-consolidacion (90% del cap). Full shipment / unsuffixed leftover: shipCap 40 -> piso 36. Full a/b caja: 20 -> piso 18. Sencillo: 26 -> piso 24. Fill toward 40 when possible; under piso -> baja eficiencia.` |
+| `LBS_COMEXTRA_MIN_FILL` | `0.9` | Full 36 / 18 | `modulo2.vba:73` | `' LBS - COMEXTRA: piso de llenado post-consolidacion (90% del cap). Full shipment / unsuffixed leftover: shipCap 40 -> piso 36. Full a/b caja: 20 -> piso 18.` |
+| `LBS_SENCILLO_MIN_PESO_FRAC` | `0.9` | 26.1 t de 29 t | `modulo2.vba` | `' OXXO/COMEXTRA Sencillo: min-fill is 90% of the 29 t lane tope (~26.1 t), not tarimas.` |
 | `LBS_LACOMER_MIN_FILL` | `0.8` | 21 de 26 | `modulo2.vba:78` | `' LBS - LA COMER: piso de llenado post-consolidacion (cap 26 -> piso 21 = 80%).` |
 | `LBS_CHEDRAUI_MIN_FILL` | `0.8` | 21 de 26 | `modulo2.vba:81` | `' LBS - CHEDRAUI: piso de llenado post-consolidacion (cap 26 -> piso 21 = 80%). Independent of EFICIENCIA POR CADENA (AR gate); truck floor is always 80%.` |
 
@@ -126,21 +127,31 @@ desde el 80 %.
 
 | Constante | Valor | Línea | Comentario original |
 |---|---|---|---|
-| `SK_MAX_PESO_KG` | `29000` | `modulo2.vba:10` | (sin comentario propio) |
-| `LBS_FULL_MAX_PESO_KG` | `52500` | `modulo2.vba:12` | `' Catalogo Mode Mix Full weight ceiling (52.5 t) for Alsuper/Go Mart Full lanes.` |
-| `PF_MAX_PESO_KG` | `29000` | `modulo5.vba:2` | (sin comentario) |
-| `SK_PESO_TARIMA_DEFAULT` | `30` | `modulo2.vba:14` | `' Tarima tare (kg). All 30 until tech specs; LBS_PesoTarimaKg picks by type.` |
-| `SK_PESO_TARIMA_CHEP` | `30` | `modulo2.vba:15` | `' TODO tech specs` |
-| `SK_PESO_TARIMA_PLASTICA` | `30` | `modulo2.vba:16` | `' TODO tech specs` |
-| `SK_PESO_TARIMA_MADERA` | `30` | `modulo2.vba:17` | `' TODO tech specs` |
+| `SK_MAX_PESO_KG` | `29000` | `modulo2.vba` | Keep in sync with `PF_MAX_PESO_KG` (modulo5). |
+| `SK_PESO_ROUND_KG` | `0` | `modulo2.vba` | Gate estricto `peso > tope`. En `1000` redondearia a toneladas (28.5 t efectivo). |
+| `LBS_FULL_MAX_PESO_KG` | `52500` | `modulo2.vba` | Full de Alsuper / Go Mart / Europea y OXXO lane F. |
+| `PF_MAX_PESO_KG` | `29000` | `modulo5.vba` | Espejo de `SK_MAX_PESO_KG`. Keep in sync. |
+| `PF_FULL_MAX_PESO_KG` | `52500` | `modulo5.vba` | Espejo de `LBS_FULL_MAX_PESO_KG`. |
+| `PF_PESO_TARIMA_KG` | `25` | `modulo5.vba` | Tara usada en `PF_RecalcPesoCamion`. Espejo de `SK_PESO_TARIMA_*`. |
+| `PF_PESO_ROUND_KG` | `0` | `modulo5.vba` | Espejo de `SK_PESO_ROUND_KG`. |
+| `SK_PESO_TARIMA_DEFAULT` | `25` | `modulo2.vba` | Pallet heavy-duty; `LBS_PesoTarimaKg` elige por tipo. |
+| `SK_PESO_TARIMA_CHEP` | `25` | `modulo2.vba` | `' TODO tech specs` |
+| `SK_PESO_TARIMA_PLASTICA` | `25` | `modulo2.vba` | `' TODO tech specs` |
+| `SK_PESO_TARIMA_MADERA` | `25` | `modulo2.vba` | `' TODO tech specs` |
 
-Las cuatro taras valen 30 kg. La estructura está lista para diferenciarlas por tipo de
-tarima (`LBS_PesoTarimaKg`, `modulo2.vba:11490`) en cuanto el cliente entregue las fichas
-técnicas; los `TODO tech specs` son de los autores del código, no de esta documentación.
+Las cuatro taras valen 25 kg. La estructura está lista para diferenciarlas por tipo de
+tarima (`LBS_PesoTarimaKg`) en cuanto el cliente entregue las fichas técnicas.
 
-El techo normal es 29 t. Los carriles Full de Alsuper y Go Mart usan 52.5 t porque el
-catálogo Mode Mix lo declara así. `LBS_MaxPesoKgForRow` (`modulo2.vba:11506`) es quien
-decide cuál aplica por fila.
+El techo sale de `Catalogo Mode Mix` columna `Peso Max` (`LBS_CatalogPesoMaxKg`): `28.9 T`
+en la mayoría de los sencillos, `30 T` en algunas lanes OXXO y `52.5 T` en Full. Si la
+lane no está en el catálogo, `LBS_MaxPesoKgForRow` cae a 29 t, o a 52.5 t en Full de
+Alsuper / Go Mart / Europea / COMEXTRA y en OXXO con lane F (`LBS_OxxoLaneMode`). OXXO no toma el
+`Peso Max` F de otro origen para una lane S. El gate es `peso > 29000` (`SK_PESO_ROUND_KG = 0`): no se redondea a toneladas.
+`LBS_PesoExcedeTope` es el criterio único; `LBS_WalmartDiscardOverWeightTruck` pela
+una tarima por pasada hasta quedar bajo el tope.
+`PF_PesoExcedeTope` lo replica en la partición de Fulls. El peso del camión es suma de
+`AT` (Peso Bruto de `TI HI`) más tara. Si un camión excede,
+`LBS_WalmartDiscardOverWeightTruck` baja carga a `No planeado` en todas las cadenas.
 
 ### Altura
 
@@ -223,7 +234,7 @@ el cupo de tarimas por carril.
 | `I` | `Tipo Equipo` | — |
 | `J` | `Especializado` | — |
 | `K` | `Pallets Max` | **El cupo.** Debe ser numérico y mayor que cero |
-| `L` | `Peso Max` | — |
+| `L` | `Peso Max` | Tope de peso del camión (`28.9 T`, `30 T`, `52.5 T`). Lo lee `LBS_CatalogPesoMaxKg` / `PF_CatalogPesoMaxKg` por lane (origen + destinatario). OXXO usa el Mode Mix de esa lane (`LBS_OxxoLaneMode`), no el dest F de otra planta. Si la fila no existe, cae a 29 t / 52.5 t. `28.9 T` se redondea a 29 t para comparar y reportar |
 
 `LBS_EnsureCatalogCaps` (`modulo2.vba:5606`) construye cuatro diccionarios: cupo Full y cupo
 Sencillo, cada uno por carril (`ID Origen Moderno|Destinatario`) y por destinatario a secas.

@@ -39,19 +39,21 @@ piso se descarta y a partir del cupo se recorta; la marca vive en la franja de e
 
 | Marca | Qué pasó |
 |---|---|
-| `REVISION MANUAL: peso >29 ton (X ton)` | El camión superó el techo normal |
+| `REVISION MANUAL: peso >29 ton (X ton)` | El camión superó el techo normal (X en toneladas enteras) |
 | `REVISION MANUAL: peso >52.5 ton (X ton)` | El camión superó el techo de carril Full |
 
-El texto lo arma `LBS_PesoReviewFlagText` (`tms_fg14/modulo2.vba:11529`) con el tope que
-aplique a esa fila. `LBS_StripPesoFlag` (`tms_fg14/modulo2.vba:22506`) las quita cuando una
-fase posterior alivia el camión, y busca exactamente los dos textos:
+El texto lo arma `LBS_PesoReviewFlagText` con el tope que aplique a esa fila. El gate es
+`peso > 29000` (`SK_PESO_ROUND_KG = 0`): no se redondea a toneladas. El peel baja una
+tarima por pasada. `LBS_StripPesoFlag` las quita cuando una fase posterior alivia el
+camión, y busca el prefijo `peso >` (cubre 29 t y 52.5 t).
 
-```
-' LBS - Quita marcas REVISION MANUAL de peso (29 t o 52.5 t) de la columna AV.
-```
+Si se ve una marca de peso en la salida final, el peel no pudo reubicar la carga. Las filas
+bajadas quedan `No planeado` con `Descartado: peso`. RecalcPeso no las remonta. En Full
+`a`/`b` el peel y AU miden el embarque (no cada caja). El camión que sigue `Programado` no
+debe superar el tope; si `AV` aún lo marca, no se puede mandar así.
 
-Si se ve una marca de peso en la salida final, es porque ninguna fase la resolvió. El camión
-no se puede mandar así.
+`LBS_DiagnosticarPeso` vuelca a la hoja `PesoDiag` el peso real, el AU escrito y si el
+folio cae en la banda del redondeo. No modifica `Pedidos Surtidos`.
 
 ### Marcas de altura
 
@@ -114,13 +116,14 @@ Lo escribe `SummaryOK` (`tms_fg14/modulo2.vba:1704-1718`) con encabezado explíc
 | `C` | `Peso ton` |
 | `D` | `Mensaje` |
 
-El mensaje es siempre `REVISION MANUAL: peso supera 29 ton`. Es la misma información que la
-columna `AV`, pero agregada por camión, que es como se revisa en operación.
+El mensaje usa el tope aplicado (`29` o `52.5`) y las toneladas enteras con las que se
+decidió. Es la misma información que la columna `AV`, agregada por camión.
 
 ### Bloque de overflow de `PartirTarimasFULL`
 
 Lo escribe `PF_WriteOverflowLog` (`modulo5.vba:1375` y `1399`) con dos mensajes:
-`REVISION MANUAL: N tarimas superan limite M` y `REVISION MANUAL: peso supera 29 ton`.
+`REVISION MANUAL: N tarimas superan limite M` y `REVISION MANUAL: peso supera 29 ton`
+(o `52.5 ton` si el camión se evaluó contra ese tope).
 Detalle en [06-partir-tarimas-full.md](06-partir-tarimas-full.md).
 
 ### Filas de `CompararCartonajes`
@@ -129,6 +132,17 @@ Detalle en [06-partir-tarimas-full.md](06-partir-tarimas-full.md).
 a `Pedidos Surtidos` con estado `No planeado` y el motivo `No reportado por LBS`. Es una
 señal distinta y más grave, porque significa que hay cartonaje del Plan que LBS ni colocó ni
 rechazó. Ver [07-fallos-y-remonte.md](07-fallos-y-remonte.md).
+
+`CompararCartonajes` corre **antes** de `LBS_ConsolidarRestos`. Un leftover `U` con el id
+de pallet del Plan (`214_Tarima` y S=58, faltan 156) es `T*V` perdido en el peel o en el
+merge COMEXTRA. `LBS_RestorePlanCartonajeGaps` vuelve a comparar Plan (máximo de M y AA)
+al final de Fallos y reencola el déficit. Si el hueco sigue, reimportar `modulo2` y
+volver a correr Fallos.
+
+Un `No planeado` en medio de un bloque `Programado` (mismo destino, Contador > 0) es
+peel de peso o restore **después** del último reorder viejo. El cierre de Fallos es
+`reorder No planeado after Plan restore` y luego Z/AU. Si el export sigue mezclado,
+reimportar `modulo2` y volver a correr Fallos. No editar el TSV a mano.
 
 ---
 
@@ -225,7 +239,7 @@ Las de `SummaryOptimizar`:
 | Fase | Línea | Qué está haciendo |
 |---|---|---|
 | `consolidar_singles` | `2533` | Uniendo sencillos con parciales |
-| `consolidar_comextra_sku` | `2537` | Consolidación por SKU de Comextra |
+| `consolidar_comextra_sku` | `2616` | Una fila por `AD|pedido|SKU`: tarimas completas en todas las cadenas; Comextra también restos |
 | `dedup_sandwich_w` | `2542` | Deduplicando la columna `W` de sándwich |
 | `filtrar_eficiencia` | `2546` | Entra a `FiltrarPorEficiencia` |
 | `filtrar:split_lacomer` / `split_chedraui` / `split_vigencia` | `4858`-`4873` | Divisiones por cadena y por vigencia |
@@ -240,7 +254,7 @@ Las de `SummaryOptimizar`:
 | `filtrar:totales_finales` | `4987` | Totales finales |
 | `filtrar:descartar_cadena` | `4993` | Descartes por cadena |
 | `filtrar:mover_no_planeado` | `5023` | Moviendo a `No planeado` |
-| `filtrar:consolidar_no_planeado` | `5043` | Intentando remontar los `No planeado` |
+| `filtrar:consolidar_no_planeado` | `5043` | Uniendo discards `No planeado` del mismo SKU |
 | `filtrar:pack_cap35` | `5056` | Empaque de mayoristas a 35 |
 | `filtrar:z_final` | `5063` | Escritura final de la columna `Z` |
 
@@ -253,12 +267,23 @@ correspondiente de [cadenas/](cadenas/README.md) es el siguiente lugar donde bus
 (`SF_SetProgress`, `tms_fg14/modulo3.vba:7`): `Fallos: restore multi-order SINGLE S`,
 `Fallos: comparar cartonajes`, `Fallos: consolidar restos`, `Fallos: listo`.
 
+Si la barra se queda en `Fallos: cannibalize to cap 28 (N)` en un libro OXXO, el Sencillo
+estaba llenándose al cupo Walmart 28. Importar el `modulo2` actual: el cap es 24/22/MTY 28
+y el receptor se salta cuando no cabe ni una tarima por peso.
+
 ---
 
 ## Herramientas de diagnóstico
 
 Las tres se ejecutan a mano, desde la lista de macros o desde los botones de `User Guide`.
 Ninguna modifica `Pedidos Surtidos`.
+
+### Diagnosticar el peso
+
+`LBS_DiagnosticarPeso` responde *"¿cuántos camiones están sobre el tope y por cuál fuente?"*
+Vuelve a calcular `suma(AT) + tara` por folio, lo compara contra el tope (con y sin
+redondeo) y escribe la hoja `PesoDiag`. No modifica `Pedidos Surtidos`. Desde Python,
+`scripts/validate_peso_all_chains.py` hace la misma auditoría sobre los `sample.tsv`.
 
 ### Diagnosticar la consolidación
 

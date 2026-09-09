@@ -73,12 +73,12 @@ piso efectivo.
 | Soriana / City Club | 26 | catálogo | catálogo / 2 | 70 % (19 de 26) | 1.6 m | 29 t |
 | Chedraui | 26 | catálogo | catálogo / 2 | 80 % (21 de 26) | 1.6 m | 29 t |
 | La Comer | 26 | catálogo | catálogo / 2 | 80 % (21 de 26) | 1.6 m | 29 t |
-| OXXO | 24 / 22 / 28 | 36 (tope) | 18 | 90 % (33 de 36) | sin tope | 29 t |
-| Neto | catálogo | 35 / 36 | catálogo / 2 | 90 % | sin tope | 29 t |
-| Comextra | 26 | 40 | 20 | 90 % (36 / 18 / 24) | 1.6 m | 29 t |
+| OXXO | 24 / 22 / 28 | 36 (tope) | 18 | Full 90 % (33 de 36); Sencillo 90 % de 29 t | sin tope | 29 t |
+| Neto | catálogo | 35 / 36 | catálogo / 2 | 90 % | sin tope | 52.5 t F / Cap35; 29 t S |
+| Comextra | 26 | 40 | 20 | Full 90 % (36 / 18); Sencillo 90 % de 29 t | 1.6 m | 29 t S / 52.5 t F (lane) |
 | Alsuper / Go Mart / Europea | 26 (catálogo) | 40 (catálogo) | 20 | 40 % | 1.6 m | 52.5 t |
 | Sams | 26 | — | — | — | sin tope | 29 t |
-| Mayoristas Cap35 | 26 | 35 o 36, camión único | no aplica | — | sin tope | 29 t |
+| Mayoristas Cap35 | 26 | 35 o 36, camión único | no aplica | — | sin tope | 52.5 t F / Cap35; 29 t S |
 | HEB | 26 | 40 | 20 | — | 1.6 m | 29 t |
 | Smart / Merco / Merza / Casa Ley | 26 | 40 | 20 | — | sin tope | 29 t |
 | Por omisión | 26 | 40 | 20 | — | sin tope | 29 t |
@@ -140,6 +140,14 @@ sobre un carril sin vigencia y después reparte, sin mezclar dentro de un camió
 La Comer es la única cadena que agrega un cuarto componente: la marca `R` o `C` de la
 columna `AE`. Ver [la-comer.md](la-comer.md).
 
+**Tarimas completas del mismo SKU.** Después de `PartirTarimasFULL`, Optimizar y Fallos
+colapsan las filas Programado `T>0 U=0` del mismo `AD|pedido|SKU` en una sola
+(`LBS_ConsolidarComextraSkuPerTruck`). Los discards `No planeado` del mismo
+origen|dest|pedido|SKU los une `ConsolidarNoPlaneados` (Optimizar tras el gate de
+eficiencia; Fallos tras el peel de peso). Comextra además une restos y sándwich
+Programado; las demás cadenas no, para no tumbar un segundo `W` del mismo material
+(La Comer, ClubCity, Walmart).
+
 ## Qué comportamientos aplica cada cadena
 
 Las banderas transversales, que se combinan de forma distinta que los cupos.
@@ -200,6 +208,7 @@ Cada página de cadena lista los suyos en la sección "Cómo validarlo". El inve
 | `tms_fg14/lacomer/` | `validate_lacomer_rc.py`, `validate_lacomer_restos.py`, `validate_lacomer_weight_tihi.py`, `validate_tihi_pkg_lacomer.py` |
 | `tms_fg14/oxxo/` | `validate_tms_oxxo.py`, `validate_oxxo_sample_z.py`, `validate_oxxo_body_type.py` |
 | `tms_fg14/comextra/` | `validate_comextra_merge.py` |
+| `tms_fg14/all_chains/` | `validate_peso_all_chains.py` (WARN: tarimas completas del mismo SKU por camión) |
 | `tms_fg14/conasuper/`, `tms_fg14/neto/` | `validate_partir_fulles_blocks.py` |
 | `tms_fg14/alsuper/`, `tms_fg14/gomart/` | `validate_plant_sencillo_chains.py`, `validate_7e_itempackage_armado.py` |
 | `tms_fg14/sams/`, `tms_fg14/heb/`, `tms_fg14/smart/`, `tms_fg14/asturiano/` | `validate_sample_tsv.py`, `validate_tihi_ao_all_chains.py` |

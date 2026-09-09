@@ -7,8 +7,13 @@ Es la hoja central de la macro de salida. Todo lo que hacen `SummaryOK`,
 reescribirla. Cuando el resultado sale mal, aquí está la evidencia.
 
 **Una fila representa una combinación de camión + pedido + SKU + tarima.** No es una fila por
-    10|camión ni una fila por pedido. Un camión (identificado por el folio de la columna `AD`)
-suele ocupar entre 15 y 40 filas.
+camión ni una fila por pedido. Un camión (identificado por el folio de la columna `AD`)
+suele ocupar entre 15 y 40 filas. Después de `PartirTarimasFULL`, `SummaryOptimizar` y
+`SummaryFallo` colapsan las tarimas completas (`T>0`, `U=0`) del mismo `AD|pedido|SKU` en
+una sola fila (`LBS_ConsolidarComextraSkuPerTruck`). Los discards `No planeado` del
+mismo origen|dest|pedido|SKU los une `ConsolidarNoPlaneados`. Comextra además une restos
+y sándwich Programado del mismo SKU; las demás cadenas no, para no tumbar un segundo
+`W` del mismo material.
 
 ## `SK_PS_LAST_COL` = 46, y por qué importa
 
@@ -236,8 +241,8 @@ If Trim$(CStr(ws.Cells(i, "H").Value)) <> "Programado" Then GoTo NextRow
 - `No planeado` — la fila quedó fuera. El motivo está en `AG`.
 
 Las filas `No planeado` no son basura: son la reserva desde la que las cadenas rellenan
-camiones que no llegan a su piso de llenado, y es lo que hace `ConsolidarNoPlaneados`
-(`tms_fg14/modulo2.vba:5075`).
+camiones que no llegan a su piso de llenado. `ConsolidarNoPlaneados` no remonta: une
+varios discards del mismo origen|dest|pedido|SKU en una sola fila (Optimizar y Fallos).
 
    220|Una condición que el motor cuida explícitamente: las filas vacías no deben quedar entre las
 `Programado` y las `No planeado`. `LBS_CompactBlankPSRows` las elimina, con este comentario
@@ -336,6 +341,9 @@ Después de todo el procesamiento, la hoja se reordena con una llave sintética
 ```
 
 Las filas `No planeado` reciben una llave que empieza con `"Z"`, lo que las manda al final.
+El último `LBS_ReordenarYCompletar` corre **después** del peel de peso y del restore de
+cartonaje Plan (`Fallos: reorder No planeado after Plan restore`). Sin esa pasada, un
+`No planeado` queda entre filas `Programado` del mismo destino.
 
 El prefijo `"K"` y el `NumberFormat = "@"` no son adorno. El comentario explica el problema
 que resolvieron (`tms_fg14/modulo2.vba:22076-22078`):

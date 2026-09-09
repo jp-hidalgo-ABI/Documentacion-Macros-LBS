@@ -37,7 +37,7 @@ Cuando se abren camiones nuevos durante el remonte, el folio se acuña con
 ## La llave de consolidación
 
 Dos filas pueden compartir camión solo si comparten la llave de consolidación. La construye
-`LBS_ConsolidaKey` (`tms_fg14/modulo2.vba:1460-1474`), y su comentario la define así:
+`LBS_ConsolidaKey` (`tms_fg14/modulo2.vba:5460-5472`), y su comentario la define así:
 
 ```
 ' LBS - Clave de camion (consolidacion) = Origen/plant (col L) + grupo [+ La Comer R/C]
@@ -537,15 +537,15 @@ AU = SUM(AT del folio) + LBS_PesoTarimaKg() * Z
 
 (`tms_fg14/modulo2.vba:1648-1651`, donde `Z` es el total de tarimas del folio.)
 
-La tara por tarima es 30 kg para los tres tipos, y el código lo marca como pendiente
-(`tms_fg14/modulo2.vba:13-17`):
+La tara por tarima es 25 kg para los tres tipos (pallet heavy-duty), pendiente de ficha
+técnica (`tms_fg14/modulo2.vba`):
 
 ```
-   490|' Tarima tare (kg). All 30 until tech specs; LBS_PesoTarimaKg picks by type.
-Private Const SK_PESO_TARIMA_DEFAULT As Double = 30#
-Private Const SK_PESO_TARIMA_CHEP As Double = 30#      ' TODO tech specs
-Private Const SK_PESO_TARIMA_PLASTICA As Double = 30#  ' TODO tech specs
-Private Const SK_PESO_TARIMA_MADERA As Double = 30#    ' TODO tech specs
+' Tarima tare (kg). Heavy-duty pallet ~25 kg; LBS_PesoTarimaKg picks by type.
+Private Const SK_PESO_TARIMA_DEFAULT As Double = 25#
+Private Const SK_PESO_TARIMA_CHEP As Double = 25#      ' TODO tech specs
+Private Const SK_PESO_TARIMA_PLASTICA As Double = 25#  ' TODO tech specs
+Private Const SK_PESO_TARIMA_MADERA As Double = 25#    ' TODO tech specs
 ```
 
 La infraestructura para diferenciar por tipo ya existe (`LBS_PesoTarimaKg` distingue `CHEP`,
@@ -557,31 +557,35 @@ hasta que lleguen las especificaciones técnicas.
 | Constante | Valor | Aplica a |
 |---|---|---|
 | `SK_MAX_PESO_KG` | `29000` | Sencillo y el resto de las cadenas |
-| `LBS_FULL_MAX_PESO_KG` | `52500` | Full de Alsuper, Go Mart y Europea |
+| `LBS_FULL_MAX_PESO_KG` | `52500` | Full de Alsuper, Go Mart, Europea, COMEXTRA y OXXO lane F |
 
-El comentario del segundo lo ubica: `' Catalogo Mode Mix Full weight ceiling (52.5 t) for
-Alsuper/Go Mart Full lanes.'` (`tms_fg14/modulo2.vba:11-12`).
+`LBS_MaxPesoKgForRow` elige 52.5 t si el catálogo F de la lane lo dice, o si falta el
+catálogo y la fila es Full de Mode Mix autoservicio, COMEXTRA o OXXO lane F. Una lane
+OXXO S queda en 28.9 / 29 t aunque `Y` diga Full. El dest F de otra planta no puede
+subir esa lane. COMEXTRA Full sin fila F (KALTEX) usa 52.5 t, no el Sencillo 29 t.
 
-   510|`LBS_MaxPesoKgForRow` (`tms_fg14/modulo2.vba:11506-11520`) elige entre los dos: 52.5 t solo
-si `Y` contiene `Full` **y** la cadena es de Mode Mix autoservicio. Todo lo demás va a 29 t.
+   510|OXXO comparte cupo y peso por lane (`LBS_OxxoLaneMode`): S = 24 + 28.9 t; F = 36 + 52.5 t.
 
 Al exceder el techo se agrega a `AV` (`LBS_PesoReviewFlagText`,
 `tms_fg14/modulo2.vba:11522-11531`):
 
 ```
-REVISION MANUAL: peso >29 ton (30.1 ton)
-REVISION MANUAL: peso >52.5 ton (54.2 ton)
+REVISION MANUAL: peso >29 ton (30 ton)
+REVISION MANUAL: peso >52.5 ton (54 ton)
 ```
 
    520|Además se registra en la hoja de fallos con el texto
 `REVISION MANUAL: peso supera 29 ton` (`tms_fg14/modulo2.vba:1716`) y se guarda en
 `weightReviewLog`, un registro por folio (`tms_fg14/modulo2.vba:1663`).
 
-Cinco familias de cadena permiten **descargar** tarimas cuando el camión pasa de peso
-(`LBS_IsPesoSalvageChain`, `tms_fg14/modulo2.vba:6312-6318`): Walmart, la familia
-`CLUBCITY` (Soriana + City Club), Alsuper, Go Mart y Europea. El comentario lo llama
-*overweight peel*. Para las demás cadenas, el exceso de peso solo genera la bandera; hay que
-resolverlo a mano.
+Todas las cadenas descargan tarimas cuando el camión pasa de peso
+(`LBS_ChainEnforcesPeso` + `LBS_WalmartDiscardOverWeightTruck`). El gate es
+`peso > 29000` (`SK_PESO_ROUND_KG = 0`). El peel baja una tarima por pasada y, en Full
+`a`/`b`, mide el embarque con la misma clave que AU (`LBS_TarimaTotalGroupKey`) hasta
+52.5 t. Lo que no cabe en otro folio del mismo grupo queda `No planeado` con
+`Descartado: peso`. En RecalcPeso, OpenTrucks no remonta esos descartes de peso.
+`LBS_IsPesoSalvageChain` sigue existiendo: gobierna altura y reconstrucción, no el peel de
+peso. El peso del camión es suma de `AT` (Peso Bruto de `TI HI`) más tara, no `Shipments!J`.
 
 ## Cómo se cuenta el espacio ocupado
    530|

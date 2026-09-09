@@ -17,8 +17,8 @@ pareja en varios puntos.
 | `LBS_IsNetoChain` | `tms_fg14/modulo2.vba:16234` | `NETO` |
 | `PF_IsOxxoChain` | `tms_fg14/modulo5.vba:379` | `OXXO` (copia para `PartirTarimasFULL`) |
 
-Ninguna tiene familia en `LBS_ChainFamily`, así que quedan fuera de las listas por familia
-(peso excedente, apertura de camiones).
+Ninguna tiene familia en `LBS_ChainFamily`. OXXO entra a OpenTrucks por mención explícita
+en `LBS_IsOpenTruckChain` (`tms_fg14/modulo2.vba:6628`), no por familia. Neto sigue fuera.
 
 `Neto` aparece además en la lista blanca de mayoristas (`LBS_IsCap35AllowChain`,
 `tms_fg14/modulo2.vba:5276`), y eso le agrega el tratamiento de
@@ -38,9 +38,10 @@ Un destinatario tiene nombre propio en el código: `400101621` es Monterrey
 | Cupo sencillo Monterrey | 28 tarimas | `LBS_OXXO_MTY_SENCILLO_CAP` (`modulo2.vba:37`) |
 | Cupo Full (tope) | 36 tarimas | `LBS_OXXO_SHIPMENT_CAP` (`modulo2.vba:32`) |
 | Cupo caja `a`/`b` | 18 tarimas | `LBS_OXXO_BOX_CAP` (`modulo2.vba:31`) |
-| Piso de llenado | 90 % del cupo = 33 de 36 | `LBS_OXXO_MIN_FILL` (`modulo2.vba:69`) |
+| Piso de llenado | Full: 90 % del cupo (33 de 36). Sencillo: 90 % de 29 t (~26.1 t), no tarimas | `LBS_OXXO_MIN_FILL` / `LBS_SENCILLO_MIN_PESO_FRAC` |
 | Altura máxima | Sin tope | `LBS_ChainEnforcesUnitHeight` no la incluye |
-| Peso máximo | 29 t | `SK_MAX_PESO_KG` (`modulo2.vba:10`) |
+| Peso Sencillo (lane S) | 28.9 t | `SK_MAX_PESO_KG` / catalog S `Peso Max` |
+| Peso Full (lane F) | 52.5 t | `LBS_FULL_MAX_PESO_KG` / catalog F `Peso Max` |
 
 El comentario que fecha el acuerdo (`tms_fg14/modulo2.vba:33-34`):
 
@@ -57,17 +58,23 @@ Y el del tope de Full (`tms_fg14/modulo2.vba:5700-5702`):
 ' has Full desenganche 40 (e.g. Pto Vallarta) — keep *_OXX until client changes equipment.
 ```
 
-Estos dos comentarios son la razón por la que **editar el catálogo Mode Mix no cambia los
-cupos de OXXO**. El código topa el cupo a 36 aunque el catálogo diga 40, y usa los cupos de
-equipo para sencillo aunque el catálogo diga 26. El comentario dice hasta cuándo: `keep *_OXX
-until client changes equipment`. Si el cliente cambia de equipo, hay que editar las
-constantes.
+El **Mode Mix de la lane** (`origen|dest` en el catálogo, `LBS_OxxoLaneMode`) elige el par
+cupo+peso: S = 24/22/28 + 28.9 t; F = 36 + 52.5 t. Un Full de LBS (`Z3500_OXX`) en una lane
+S se fuerza a Sencillo (`LBS_ForceOxxoLaneY`). El techo de pallets sigue siendo de equipo:
+36 aunque el catálogo diga 40, 24 aunque el S diga 26. Un Full de otro origen no puede
+subir una lane S a 36. Si el cliente cambia de equipo, hay que editar las constantes
+`LBS_OXXO_*`.
 
-El piso del 90 % es el más alto de la macro junto con Comextra:
+El piso del 90 % es el más alto de la macro junto con Comextra. En Full es 90 % del
+cupo (33 de 36). En Sencillo es 90 % del tope de 29 t (~26.1 t): el empaque sigue
+llenando hasta 29 t o el cupo de tarimas, y el camión se queda Programado si el peso
+llega a ese piso.
 
 ```
 ' LBS - OXXO Full: piso de llenado post-consolidacion (90% del shipCap 36 -> piso 33).
 Private Const LBS_OXXO_MIN_FILL As Double = 0.9
+' OXXO/COMEXTRA Sencillo: min-fill is 90% of the 29 t lane tope (~26.1 t), not tarimas.
+Private Const LBS_SENCILLO_MIN_PESO_FRAC As Double = 0.9
 ```
 
 ### Neto
@@ -142,14 +149,46 @@ cajas, insertando renglones. Detalle en
 **Sin sándwich por unidad.** Tampoco están en `LBS_IsSandwichWChain`
 (`tms_fg14/modulo2.vba:6353`).
 
+**Una fila de tarimas completas por confirmación, pedido y SKU.** El mismo colapso
+que Comextra (`LBS_ConsolidarComextraSkuPerTruck`) aplica a OXXO y al resto de
+cadenas cuando las filas son tarimas completas (`T>0`, `U=0`), sin marca
+`LBS_SANDWICH`. Un sencillo como `P-1273` con el mismo SKU partido en `5+5+5+4`
+queda en una sola fila `T=19`. Fallos lo vuelve a correr después del peel de peso:
+`RecalcPeso` / min-fill pueden remountar un trozo (`14+5`) sobre el mismo folio.
+Los discards `No planeado` del mismo origen|dest|pedido|SKU (peels `T=1` de peso,
+baja eficiencia) los une `ConsolidarNoPlaneados` en esa misma pasada. No une restos
+ni sándwich Programado (OXXO no los usa) ni las cajas `a`/`b` (la llave es el folio `AD`).
+
 **Bandera de presencia.** `LBS_HasOxxo` (`tms_fg14/modulo2.vba:6275`) permite al
 consolidador de fallos saltarse las fases de OXXO cuando no hay ninguna fila de la cadena.
+
+**OpenTrucks en Fallos.** `LBS_WalmartOpenTrucksForNoReportadoGaps` toma todo el `No planeado`
+de OXXO (cualquier `AG`, incluido en blanco) en la misma `LBS_ConsolidaKey`
+(planta|dest|vigencia). Primero llena spare de folios Programado; si no hay, inventa un
+folio plantilla (`LBS_OpenTruckInventTemplateAD` + `LBS_OxxoInventYFromLane`) con `Y` de
+la lane (`Full caja seca` o `Sencillo Caja seca 53'`). El cupo sale de
+`LBS_TruckCapForRow` (24/22/28 o 36), no del metro 26. Un resto `T=0 U>0` cuenta como un
+espacio. Los `Descartado: peso >29 ton` (y 52.5 t en lane F) entran al mismo pool en
+OpenTrucks de Fallos: el camión nuevo se llena hasta el tope de peso de la lane
+(`LBS_OpenTruckMaxTForWeight`) y parte la fila si no cabe. En RecalcPeso no se remontan
+(`skipPesoGaps`); un segundo peel baja lo que el remonte de cupo haya vuelto a pasar
+de 29 t. No se abre un folio bajo el piso ni sobre el peso: si una sola tarima ya
+excede el tope, esa fila se queda `No planeado`. Sencillo abre o cierra el folio si el
+peso llega a 90 % de 29 t (`LBS_SencilloMinPesoKg`); Full sigue en 90 % del cupo de
+tarimas. Un vidrio COMEXTRA que no puede llegar a 26.1 t sin pasar 29 t queda
+`No planeado`.
 
 ## 4. Procedimientos
 
 | Procedimiento | Línea | Qué hace |
 |---|---|---|
 | `LBS_IsOxxoChain` | `16230` | Reconoce `OXXO` |
+| `LBS_OxxoLaneMode` | `modulo2` | Mode Mix F/S de `origen|dest`; no usa dest de otra planta |
+| `LBS_ForceOxxoLaneY` | `modulo2` | Alinea `Y` (Programado y No planeado) al Mode Mix de la lane |
+| `LBS_IsOpenTruckChain` | `6628` | Incluye OXXO para remonte / folios nuevos |
+| `LBS_SencilloMinPesoKg` | `modulo2` | Piso Sencillo OXXO/COMEXTRA: 90 % del tope de peso de la lane |
+| `LBS_OxxoInventYFromLane` | `6666` | `Y` de invent: lane F = Full, si no Sencillo |
+| `LBS_OpenTruckInventTemplateAD` | `21640` | Inventa AD cuando el destino solo tiene No planeado |
 | `LBS_IsNetoChain` | `16234` | Reconoce `NETO` |
 | `LBS_HasOxxo` | `6275` | Bandera de presencia en la hoja |
 | `LBS_ApplyOxxoSencilloEquipCap` | `5770` | Traduce el cupo de catálogo al cupo de equipo (24 / 22 / 28) |
@@ -194,18 +233,24 @@ Scripts:
 | `scripts/validate_oxxo_sample_z.py` | El total de la columna `Z` por embarque base |
 | `scripts/validate_oxxo_body_type.py` | El tipo de caja asignado |
 | `scripts/validate_partir_fulles_blocks.py` | La división en cajas `a` y `b` |
+| `scripts/validate_peso_all_chains.py` | Par cupo+peso por lane; tara 25 / gate 29 t; anti-patron PC03-LEON; WARN si el mismo SKU sigue partido en tarimas completas (`P-1273`) |
 
 ## 6. Problemas conocidos y síntomas
 
 | Síntoma | Causa probable | Dónde mirar |
 |---|---|---|
 | Sencillos de 26 tarimas en OXXO | La fila no se reconoció como OXXO | Revisar el literal exacto de `Pedidos Surtidos!M`; el comentario dice `never catalog S/26` |
-| Cambiar el catálogo Mode Mix no mueve el cupo | Es deliberado: OXXO usa cupos de equipo, topados a 36 en Full | Constantes `LBS_OXXO_*` en `modulo2.vba:31-38` |
+| Cambiar el catálogo Mode Mix no mueve el cupo de equipo | El S/F de la lane sí elige el par; el tope 24/36 sigue en constantes | `LBS_OxxoLaneMode` + `LBS_OXXO_*` |
 | Full de 40 en OXXO | No debería pasar: el tope es 36 | `LBS_CatalogFullShipmentCap`, líneas `5744-5746` |
 | Caja `a` con 36 tarimas y sin caja `b` | El caso `P-1025a` del comentario | `LBS_RebalanceOxxoFullAb` debería crear la gemela. Si no, es una regresión |
 | Dos embarques donde debería haber uno | El total `Z` se agrupó por folio en lugar de por embarque base | `LBS_TarimaTotalGroupKey` |
-| `Descartado por baja eficiencia` con 30 o 32 tarimas | Bajo el piso de 33, que es el 90 % de 36 | `LBS_OXXO_MIN_FILL`. Es el piso más exigente de la macro |
+| Destino con 0 Programado y mucho `No planeado` | OpenTrucks no inventaba folio OXXO | `LBS_IsOpenTruckChain` + `LBS_OpenTruckInventTemplateAD` |
+| `Descartado: peso` vuelve a salir igual en el folio nuevo | El open empacaba solo por cupo | `LBS_OpenTruckMaxTForWeight` |
+| `Descartado por baja eficiencia` con 30 o 32 tarimas en lane F | Bajo el piso de 33 (90 % de 36) | `LBS_OXXO_MIN_FILL` |
+| Full a 28.9 t o Sencillo a 36 tarimas | Cupo y peso no compartían la lane | `LBS_OxxoLaneMode` / `LBS_ForceOxxoLaneY` |
 | Monterrey con cupo 24 en lugar de 28 | El destinatario de la columna `O` no es exactamente `400101621` | `LBS_OXXO_MTY_DEST` |
+| 5 tarimas Programado y 19 `Descartado: peso` en PC03→LEON | El peel tiraba la fila entera (19) y dejaba el resto | `LBS_WalmartDiscardOverWeightTruck` pela 1 tarima; LBS ya arma `P-1003` (19) + `P-1286` (18+2, una peel si AU >29 t) |
+| Fallos cuelga en `cannibalize to cap 28` | El Sencillo OXXO usaba cupo Walmart 28 y seguía robando contra el tope de 29 t | `LBS_WalmartCannibalizeToCap` usa 24/22/MTY 28 y salta el receptor si no cabe ni 1 tarima por peso |
 | `AO` vacío en OXXO | Es lo esperado: OXXO no calcula altura de unidad | `LBS_ChainEnforcesUnitHeight` no lo incluye |
 | SKU de Neto que no llega a 35 | No está marcado `YES` en `Cadenas 35 Tarimas`, o `Neto` no está en la lista blanca | Ver [mayoristas-cap35.md](mayoristas-cap35.md) |
 | Folios `P-####` nuevos | División por orígenes mezclados | `LBS_SplitChedrauiMixedOriginFolios`, que también sirve a OXXO y Neto |

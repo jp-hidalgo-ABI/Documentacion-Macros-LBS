@@ -27,9 +27,10 @@ explícita: `LBS_IsOpenTruckChain` (`tms_fg14/modulo2.vba:6321`) y
 | Cupo caja `a`/`b` | 20 tarimas | `LBS_FULL_BOX_CAP` (`modulo2.vba:29`) |
 | Aviso de división | 20 tarimas por confirmación | `LBS_COMEXTRA_SPLIT_CAP` (`modulo2.vba:27`) |
 | Cupo sencillo | 26 tarimas | `LBS_METRO_TRUCK_CAP` (`modulo2.vba:19`) |
-| Piso de llenado | 90 %: 36 de 40, 18 de 20, 24 de 26 | `LBS_COMEXTRA_MIN_FILL` (`modulo2.vba:73`) |
+| Piso de llenado | Full: 90 % del cupo (36 de 40 / 18 de 20). Sencillo: 90 % de 29 t (~26.1 t) | `LBS_COMEXTRA_MIN_FILL` / `LBS_SENCILLO_MIN_PESO_FRAC` |
 | Altura máxima de unidad | 1.60 m | `LBS_ChainMaxUnitHeightM` (`modulo2.vba:11908-11912`) |
-| Peso máximo | 29 t | `SK_MAX_PESO_KG` (`modulo2.vba:10`) |
+| Peso máximo Sencillo | 29 t | `SK_MAX_PESO_KG` (`modulo2.vba:10`) |
+| Peso máximo Full | 52.5 t | `LBS_FULL_MAX_PESO_KG`; fallback si el catálogo no tiene fila F |
 
 Comentarios originales:
 
@@ -43,11 +44,17 @@ Private Const LBS_COMEXTRA_SPLIT_CAP As Long = 20
 ```
 ' LBS - COMEXTRA: piso de llenado post-consolidacion (90% del cap).
 ' Full shipment / unsuffixed leftover: shipCap 40 -> piso 36. Full a/b caja: 20 -> piso 18.
-' Sencillo: 26 -> piso 24. Fill toward 40 when possible; under piso -> baja eficiencia.
+' Sencillo: min-fill is 90% of 29 t (~26.1 t), not tarimas.
 ```
 
-Tres pisos distintos según el tipo de camión, y una instrucción de negocio explícita: `Fill
-toward 40 when possible`. Comextra prefiere camiones llenos a camiones repartidos.
+Full sigue midiendo el piso en tarimas. Sencillo abre o se queda Programado si el peso
+llega a 90 % de 29 t. Comextra prefiere camiones llenos a camiones repartidos
+(`Fill toward 40 when possible` en Full).
+
+Un Full **sin** sufijo `a`/`b` es su propio camión, aunque exista `P-####a`/`b` del mismo
+número. El recorte a 40 puede dejar un resto de 1 tarima en el AD base (`P-1428` junto a
+`P-1428a`/`b`). `LBS_EnforceWalmartMinFill` lo agrupa con `|loose` para no sumarlo al
+embarque a+b; si queda bajo 36, pasa a `No planeado`.
 
 El tope de 40 es duro, con su propia verificación
 (`tms_fg14/modulo2.vba:5749-5751`):
@@ -61,21 +68,29 @@ If LBS_IsComextraChain(mVal) Then
 Igual que en OXXO, el catálogo Mode Mix no puede subir el cupo por encima del límite del
 equipo.
 
+El peso sigue la lane de este origen|dest, igual que OXXO
+(`LBS_ComextraLaneMode` / `PF_ComextraLaneMode`). Torreon PC29 F es 52.5 t aunque
+LBS haya escrito `Y=Sencillo`. Torreon PC01 S es 28.9 t. Un dest-level Full de
+otra planta no convierte un Sencillo. Si la lane no existe (KALTEX) y `Y` tiene
+Full, el fallback sigue siendo 52.5 t (`LBS_FULL_MAX_PESO_KG`). El peel de
+peso suma `a`+`b` como un embarque (igual que AU); el cupo sigue midiendo cada confirmación
+por separado.
+
 `LBS_COMEXTRA_SPLIT_CAP` se describe como "aviso blando" y produce la marca
 `REVISION MANUAL: tarimas >20` (`tms_fg14/modulo2.vba:16284`): no bloquea nada, solo señala
 que la confirmación es más grande de lo que LBS suele armar.
 
 ## 3. Reglas de negocio
 
-**Una fila por confirmación, pedido y SKU.** Es la regla central. El comentario de
-`LBS_ConsolidarComextraSkuPerTruck` (`tms_fg14/modulo2.vba:18304-18308`):
+**Una fila por confirmación, pedido y SKU.** Es la regla central. La función
+`LBS_ConsolidarComextraSkuPerTruck` es compartida: en todas las cadenas colapsa
+tarimas completas (`T>0`, `U=0`) del mismo `AD|pedido|SKU`. Comextra además une
+restos y anclas de sándwich del mismo SKU. El comentario
+(`tms_fg14/modulo2.vba`):
 
 ```
-' COMEXTRA: one Programado row per confirmacion (AD) + pedido + SKU.
-' Includes bare fulls (T=1 per line, e.g. shipment 1055 / 3008461) and sandwich
-' remnants (each leftover ANCHOR paid W=1). Collapse cartonaje, recalc T/U from
-' S/V, keep a single W (max of members, never the sum). Does not merge a/b or NP.
-' Call after PartirFulles only (Optimizar / Fallos). Returns deleted donor rows.
+' One Programado row per confirmacion (AD) + pedido + SKU.
+' No planeado discards are ConsolidarNoPlaneados (origen|dest|pedido|SKU), not this fn.
 ```
 
 Los detalles que importan:
@@ -84,7 +99,8 @@ Los detalles que importan:
   (`S`) y el cartonaje (`V`). No se suman las columnas de las filas originales.
 - La columna `W` se queda con el **máximo** de las filas unidas, nunca la suma. Sumarla
   contaría el mismo espacio de piso varias veces.
-- **No** se unen las cajas `a` y `b`, ni las filas `No planeado`.
+- **No** se unen las cajas `a` y `b`. Los discards `No planeado` del mismo
+  origen|dest|pedido|SKU los une `ConsolidarNoPlaneados`, sin mezclarse con Programado.
 - Solo corre después de `PartirTarimasFULL`. Correrlo antes uniría filas que la división
   todavía va a separar.
 
@@ -121,27 +137,19 @@ una sola unidad viajan con la que las hospede.
 (`tms_fg14/modulo2.vba:18505`) llena el espacio libre de los camiones con filas descartadas.
 Es la consecuencia práctica del `Fill toward 40 when possible`.
 
-**Apertura de camiones nuevos.** Comextra está en `LBS_IsOpenTruckChain`
-(`tms_fg14/modulo2.vba:6321`) por mención explícita, no por familia. Y tiene un caso especial
-en la elegibilidad de motivos (`LBS_IsOpenTruckGapAG`, `tms_fg14/modulo2.vba:6327`), con este
-comentario (`tms_fg14/modulo2.vba:6324-6325`):
+**Apertura de camiones nuevos.** Comextra está en `LBS_IsOpenTruckChain` por mención
+explícita, junto con OXXO. `LBS_IsOpenTruckGapAG` acepta cualquier `AG` (incluido en
+blanco) para ambas cadenas.
 
-```
-' Remountable NP AG for OpenTrucks. COMEXTRA cupo leftovers often have blank AG
-' after ClearWalmartDismountedInfo — still eligible when cadena is COMEXTRA.
-```
-
-Los sobrantes de cupo de Comextra pierden el motivo de descarte al limpiarse la información
-de lo desmontado. Sin esta excepción quedarían inelegibles para remontarse solo por tener la
-columna `AG` vacía.
-
-`LBS_ComextraInventTemplateAD` (`tms_fg14/modulo2.vba:20380`) inventa el folio plantilla
-cuando hace falta abrir un camión y no hay uno del cual copiar.
+`LBS_OpenTruckInventTemplateAD` inventa el folio plantilla cuando el destino solo tiene
+`No planeado`. El alias `LBS_ComextraInventTemplateAD` delega ahí. El cupo del Sencillo
+inventado sale de `LBS_SencilloCapForRow` (p. ej. Torreón 20), no del metro 26. Un pack
+Sencillo que no llega a 26.1 t sin pasarse de 29 t se queda `No planeado`.
 
 **Un SKU por camión, con degradación.** `LBS_ComextraDemoteOneCartonTarimas`
 (`tms_fg14/modulo2.vba:11825`) degrada tarimas de un solo cartón, y
-`LBS_ComextraHostAIOnAD` / `LBS_ComextraOtherHostAIOnAD` (`tms_fg14/modulo2.vba:11801` y
-`11857`) buscan la unidad anfitriona donde colocar una charola.
+`LBS_ComextraHostAIOnAD` (`tms_fg14/modulo2.vba:11801`) /
+`LBS_ComextraOtherHostAIOnAD` (`tms_fg14/modulo2.vba:11857`) buscan la unidad anfitriona donde colocar una charola.
 
 **Altura, camas compartidas y sándwich.** Comextra está en las tres listas:
 `LBS_ChainEnforcesUnitHeight` (`tms_fg14/modulo2.vba:11895`),
@@ -161,7 +169,7 @@ catálogo.
 | `LBS_ComextraDemoteOneCartonTarimas` | `11825` | Degrada tarimas de un solo cartón |
 | `LBS_ComextraOtherHostAIOnAD` | `11857` | Busca una unidad anfitriona alterna |
 | `LBS_ApplyComextraTarimaCapFlags` | `16278` | Escribe las marcas de `REVISION MANUAL` por cupo |
-| `LBS_ConsolidarComextraSkuPerTruck` | `18309` | Colapsa a una fila por confirmación, pedido y SKU |
+| `LBS_ConsolidarComextraSkuPerTruck` | `20040` | Colapsa a una fila por confirmación, pedido y SKU (todas las cadenas: solo tarimas completas; Comextra también restos) |
 | `LBS_ComextraFillSpareFromNP` | `18505` | Rellena el espacio libre desde `No planeado` |
 | `LBS_ComextraInventTemplateAD` | `20380` | Inventa el folio plantilla para un camión nuevo |
 | `LBS_IsOpenTruckGapAG` | `6327` | Elegibilidad de remonte, con la excepción de `AG` vacía |
@@ -182,7 +190,9 @@ Script:
 
 | Script | Qué comprueba |
 |---|---|
-| `scripts/validate_comextra_merge.py` | La consolidación a una fila por confirmación, pedido y SKU |
+| `scripts/validate_comextra_merge.py` | La consolidación a una fila por confirmación, pedido y SKU; el contrato VBA de all-chains (`T>0 U=0`) |
+| `scripts/validate_peso_all_chains.py` | WARN si el sample sigue partiendo tarimas completas del mismo SKU (p. ej. `P-1273`) |
+| `scripts/validate_cartonaje_conservation.py` | Plan vs sample (bajo y sobre); llaves 156-gap COMEXTRA/GO MART |
 
 ## 6. Problemas conocidos y síntomas
 
@@ -197,3 +207,7 @@ Script:
 | Charolas contadas de más | La densificación de `SummaryFallo` no corrió | Es el diseño en dos etapas: primero conservador, después denso. Correr `SummaryFallo` |
 | Camiones a 25 tarimas cuando cabían 40 | El relleno desde `No planeado` no encontró qué subir | `LBS_ComextraFillSpareFromNP` |
 | Full de más de 40 | El catálogo Mode Mix declara un cupo mayor | El código lo topa. Si aparece, revisar el tope de `modulo2.vba:5749-5751` |
+| Leftover `U` (S=58) y pallet id `214_Tarima` sin la tarima de 156 | El merge o el peel de altura tiró `T*V` y dejó solo restos | `LBS_ConsolidarComextraSkuPerTruck` reencola el excedente a NP; `LBS_RestorePlanCartonajeGaps` corre al final. `CompararCartonajes` al inicio no cierra un hueco que Fallos abre después |
+| Full `P-1428` de 1 tarima Programado junto a `P-1428a`/`b` | El min-fill sumaba el resto al embarque a+b (ya en 40) y lo daba por lleno | `|loose` en `LBS_EnforceWalmartMinFill`; `Fallos: min-fill after RecalcPeso` |
+| Full AW 29000 / AV `peso >29 ton` con Y Full | Catálogo sin fila F (KALTEX) caía al Sencillo 29 t | `LBS_MaxPesoKgForRow` / `PF_MaxPesoKgForRow`: COMEXTRA Full → 52.5 t |
+| Full `a`+`b` Programado sobre 52.5 t | El peel medía cada caja (~27 t) y AU el embarque | `LBS_WalmartDiscardOverWeightTruck` usa `LBS_TarimaTotalGroupKey` |
